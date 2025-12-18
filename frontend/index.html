@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Chat Stats</title>
+  <link rel="icon" href="/static/favicon.ico">
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0b1020;
+      color: #f5f5f7;
+      margin: 0;
+      padding: 24px 16px 40px;
+    }
+    .page {
+      max-width: 1080px;
+      margin: 0 auto;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 16px;
+    }
+    h1 {
+      margin: 0 0 4px;
+      font-size: 1.6rem;
+    }
+    .subtitle {
+      margin: 0;
+      font-size: 0.9rem;
+      color: #9ca3af;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+    .card {
+      background: #151a30;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+      display: flex;
+      flex-direction: column;
+      min-height: 180px;
+    }
+    .card h2 {
+      font-size: 1.05rem;
+      margin: 0;
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      gap: 8px;
+    }
+    .card-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+    }
+    button {
+      background: #4f46e5;
+      color: white;
+      border: none;
+      border-radius: 999px;
+      padding: 6px 14px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    button:hover {
+      background: #6366f1;
+    }
+    input, select {
+      background: #0b1020;
+      color: #f5f5f7;
+      border-radius: 999px;
+      border: 1px solid #272b40;
+      padding: 4px 10px;
+      font-size: 0.85rem;
+      margin-right: 4px;
+      margin-bottom: 4px;
+    }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 4px;
+      margin-bottom: 8px;
+    }
+    .bar-chart {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 4px;
+      height: 220px;
+      margin-top: 8px;
+      padding-top: 12px;
+      padding-bottom: 22px;
+      border-bottom: 1px solid #272b40;
+      overflow-x: auto;
+    }
+    .bar {
+      background: #10b981;
+      flex: 1 1 auto;
+      min-width: 12px;
+      max-width: 40px;
+      border-radius: 6px 6px 0 0;
+      position: relative;
+    }
+    .bar span {
+      position: absolute;
+      bottom: -18px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.6rem;
+      white-space: nowrap;
+    }
+    .bar::after {
+      content: attr(data-value);
+      position: absolute;
+      top: -16px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.7rem;
+      color: #a5b4fc;
+    }
+    .muted {
+      color: #9ca3af;
+      font-size: 0.8rem;
+    }
+    .legend {
+      margin-top: 6px;
+      font-size: 0.8rem;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #0b1020;
+      font-size: 0.75rem;
+      margin: 2px;
+    }
+    .pill span.count {
+      color: #a5b4fc;
+      margin-left: 4px;
+    }
+    .list {
+      margin: 6px 0 0;
+      padding: 0;
+      list-style: none;
+      font-size: 0.8rem;
+      max-height: 220px;
+      overflow: auto;
+    }
+    .list li {
+      padding: 2px 0;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+    }
+    .list li:last-child {
+      border-bottom: none;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+      margin-top: 4px;
+    }
+    th, td {
+      padding: 4px 6px;
+      text-align: left;
+    }
+    th {
+      font-weight: 600;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.4);
+    }
+    td {
+      border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+    }
+    tr:last-child td {
+      border-bottom: none;
+    }
+    .error {
+      color: #fecaca;
+      font-size: 0.8rem;
+      margin-top: 4px;
+    }
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      display: inline-block;
+      margin-right: 4px;
+    }
+    .section-label {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #6b7280;
+      margin: 16px 0 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <div>
+        <h1>Chat Stats</h1>
+        <p class="subtitle">Yes, we really sent that many messages.</p>
+      </div>
+    </header>
+
+    <div class="section-label">Overview</div>
+    <div class="grid">
+      <div class="card">
+        <div class="card-header">
+          <h2>Messages</h2>
+          <button onclick="loadMessages()">
+            <span>⟳</span><span>Refresh</span>
+          </button>
+        </div>
+        <div class="card-body">
+          <div id="messages-output" class="muted">Loading…</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2>Streaks</h2>
+          <button onclick="loadStreaks()">
+            <span>⟳</span><span>Refresh</span>
+          </button>
+        </div>
+        <div class="card-body">
+          <div id="streaks-output" class="muted">Loading…</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-label">Language</div>
+    <div class="grid">
+      <div class="card">
+        <div class="card-header">
+          <h2>Top Words</h2>
+          <button onclick="loadTopWords()">
+            <span>⟳</span><span>Refresh</span>
+          </button>
+        </div>
+        <div class="card-body">
+          <div class="controls">
+            <label>Top N:
+              <input id="top-n" type="number" min="1" value="10" />
+            </label>
+            <label>Min length:
+              <input id="top-min-len" type="number" min="1" value="3" />
+            </label>
+            <label>Extra skip:
+              <input id="top-skip" type="text" placeholder="e.g. ой, ахах" />
+            </label>
+          </div>
+          <div id="top-words-output" class="muted">Loading…</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2>Search Words</h2>
+          <button onclick="searchWords()">
+            <span>🔍</span><span>Search</span>
+          </button>
+        </div>
+        <div class="card-body">
+          <div class="controls">
+            <label>Words:
+              <input id="search-words" type="text" placeholder="e.g. сука, блять" />
+            </label>
+          </div>
+          <div id="search-output" class="muted">Search results will appear here.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-label">Timeline</div>
+    <div class="grid">
+      <div class="card">
+        <div class="card-header">
+          <h2>Monthly Activity</h2>
+          <button onclick="loadMonthly()">
+            <span>⟳</span><span>Refresh</span>
+          </button>
+        </div>
+        <div class="card-body">
+          <div id="monthly-chart" class="bar-chart"></div>
+          <div id="monthly-output" class="muted">Loading…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const colorPalette = [
+      "#0048ff",
+      "#8914fa",
+      "#facc15",
+      "#38bdf8",
+      "#34d399",
+      "#fb7185",
+      "#e5e7eb",
+    ];
+    const personColors = {};
+    let colorIndex = 0;
+
+    function getPersonColor(name) {
+      if (!name) return "#6b7280";
+      if (!personColors[name]) {
+        personColors[name] = colorPalette[colorIndex % colorPalette.length];
+        colorIndex += 1;
+      }
+      return personColors[name];
+    }
+
+    async function getJSON(url, options = {}) {
+      const res = await fetch(url, {
+        headers: { "Content-Type": "application/json" },
+        ...options,
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`HTTP ${res.status}: ${text}`);
+      }
+      return res.json();
+    }
+
+    function showError(elId, message) {
+      const el = document.getElementById(elId);
+      el.innerHTML = `<p class="error">${message}</p>`;
+    }
+
+    function renderMessages(data) {
+      const el = document.getElementById("messages-output");
+      const total = data.total_messages ?? 0;
+      const perPerson = data.per_person || {};
+      const entries = Object.entries(perPerson).sort((a, b) => b[1] - a[1]);
+      const top = entries.slice(0, 10);
+
+      let html = `<p><strong>Total messages:</strong> ${total}</p>`;
+      if (!entries.length) {
+        html += `<p class="muted">No per-person data.</p>`;
+      } else {
+        html += `<p class="muted">Top senders:</p><ul class="list">`;
+        top.forEach(([name, count]) => {
+          const color = getPersonColor(name);
+          html += `<li><span class="dot" style="background:${color}" title="${name}"></span>${name} — ${count}</li>`;
+        });
+        html += `</ul>`;
+        if (entries.length > 10) {
+          html += `<p class="muted">Showing top 10 of ${entries.length} people.</p>`;
+        }
+      }
+      el.innerHTML = html;
+    }
+
+    async function loadMessages() {
+      try {
+        const data = await getJSON("/stats/messages");
+        renderMessages(data);
+      } catch (e) {
+        showError("messages-output", e.message);
+      }
+    }
+
+    async function loadTopWords() {
+      const topN = document.getElementById("top-n").value || 10;
+      const minLen = document.getElementById("top-min-len").value || 3;
+      const skipRaw = document.getElementById("top-skip").value || "";
+      const extraSkip = skipRaw
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+
+      const params = new URLSearchParams();
+      params.set("top_n", topN);
+      params.set("min_len", minLen);
+      extraSkip.forEach((w) => params.append("skip", w));
+
+      try {
+        const data = await getJSON(`/stats/words/top?${params.toString()}`);
+        renderTopWords(data);
+      } catch (e) {
+        showError("top-words-output", e.message);
+      }
+    }
+
+    function renderTopWords(data) {
+      const el = document.getElementById("top-words-output");
+      if (!Array.isArray(data) || !data.length) {
+        el.innerHTML = `<p class="muted">No words found.</p>`;
+        return;
+      }
+
+      let html = `<table><thead><tr><th>Word</th><th>Total</th><th>People</th></tr></thead><tbody>`;
+      data.forEach((item) => {
+        const word = item.word;
+        const total = item.total_count;
+        const per = item.per_person || {};
+        const peopleEntries = Object.entries(per).sort((a, b) => b[1] - a[1]).slice(0, 4);
+        let peopleHtml = "";
+        if (!peopleEntries.length) {
+          peopleHtml = `<span class="muted">-</span>`;
+        } else {
+          peopleEntries.forEach(([name, count]) => {
+            const color = getPersonColor(name);
+            peopleHtml += `<span class="pill" title="${name}"><span class="dot" style="background:${color}"></span><span class="count">${count}</span></span>`;
+          });
+        }
+        html += `<tr><td>${word}</td><td>${total}</td><td>${peopleHtml}</td></tr>`;
+      });
+      html += `</tbody></table>`;
+      el.innerHTML = html;
+    }
+
+    async function searchWords() {
+      const raw = document.getElementById("search-words").value || "";
+      const words = raw
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+      if (!words.length) {
+        showError("search-output", "Enter at least one word");
+        return;
+      }
+      try {
+        const data = await getJSON("/stats/words/search", {
+          method: "POST",
+          body: JSON.stringify(words),
+        });
+        renderSearchResults(data);
+      } catch (e) {
+        showError("search-output", e.message);
+      }
+    }
+
+    function renderSearchResults(data) {
+      const el = document.getElementById("search-output");
+      const entries = Object.entries(data || {});
+      if (!entries.length) {
+        el.innerHTML = `<p class="muted">No data for these words.</p>`;
+        return;
+      }
+      let html = `<table><thead><tr><th>Word</th><th>Total</th><th>People</th></tr></thead><tbody>`;
+      entries.forEach(([word, stats]) => {
+        const total = stats.total_count ?? 0;
+        const per = stats.per_person || {};
+        const peopleEntries = Object.entries(per).sort((a, b) => b[1] - a[1]);
+        let peopleHtml = "";
+        if (!peopleEntries.length) {
+          peopleHtml = `<span class="muted">-</span>`;
+        } else {
+          peopleEntries.forEach(([name, count]) => {
+            const color = getPersonColor(name);
+            peopleHtml += `<span class="pill" title="${name}"><span class="dot" style="background:${color}"></span><span class="count">${count}</span></span>`;
+          });
+        }
+        html += `<tr><td>${word}</td><td>${total}</td><td>${peopleHtml}</td></tr>`;
+      });
+      html += `</tbody></table>`;
+      el.innerHTML = html;
+    }
+
+    function renderMonthlyChart(data) {
+      const container = document.getElementById("monthly-chart");
+      container.innerHTML = "";
+      const entries = Object.entries(data);
+      if (!entries.length) return;
+
+      const maxVal = Math.max(...entries.map(([_, v]) => v));
+      entries.forEach(([month, value]) => {
+        const bar = document.createElement("div");
+        bar.className = "bar";
+        const height = maxVal === 0 ? 0 : (value / maxVal) * 100;
+        bar.style.height = `${Math.max(height, 3)}%`;
+        bar.setAttribute("data-value", value);
+        const label = document.createElement("span");
+        label.textContent = month;
+        bar.appendChild(label);
+        container.appendChild(bar);
+      });
+    }
+
+    async function loadMonthly() {
+      try {
+        const data = await getJSON("/stats/time/monthly");
+        renderMonthlyChart(data);
+        renderMonthlySummary(data);
+      } catch (e) {
+        showError("monthly-output", e.message);
+      }
+    }
+
+    function renderMonthlySummary(data) {
+      const el = document.getElementById("monthly-output");
+      const entries = Object.entries(data || {});
+      if (!entries.length) {
+        el.innerHTML = `<p class="muted">No monthly data.</p>`;
+        return;
+      }
+      const total = entries.reduce((sum, [, v]) => sum + v, 0);
+      const [busiestMonth, busiestCount] = entries.reduce(
+        (best, curr) => (curr[1] > best[1] ? curr : best),
+        ["", 0]
+      );
+      el.innerHTML = `<p><strong>Total messages:</strong> ${total}</p>
+        <p class="muted">Busiest month: <strong>${busiestMonth}</strong> (${busiestCount} messages)</p>`;
+    }
+
+    async function loadStreaks() {
+      try {
+        const data = await getJSON("/stats/streaks");
+        renderStreaks(data);
+      } catch (e) {
+        showError("streaks-output", e.message);
+      }
+    }
+
+    function renderStreaks(data) {
+      const el = document.getElementById("streaks-output");
+      const talking = data.talking || {};
+      const silent = data.silent || {};
+      const tLen = talking.length_days ?? 0;
+      const sLen = silent.length_days ?? 0;
+
+      let html = "";
+      html += `<p><strong>Talking streak:</strong> ${tLen} days`;
+      if (talking.start_date && talking.end_date) {
+        html += ` <span class="muted">(${talking.start_date} → ${talking.end_date})</span>`;
+      }
+      html += `</p>`;
+
+      html += `<p><strong>Silent streak:</strong> ${sLen} days`;
+      if (silent.start_date && silent.end_date) {
+        html += ` <span class="muted">(${silent.start_date} → ${silent.end_date})</span>`;
+      }
+      html += `</p>`;
+
+      el.innerHTML = html;
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      loadMessages();
+      loadTopWords();
+      loadMonthly();
+      loadStreaks();
+    });
+  </script>
+</body>
+</html>
+
+
