@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
   <meta charset="UTF-8" />
   <title>Chat Stats</title>
   <link rel="icon" href="/static/favicon.ico">
@@ -217,6 +219,13 @@
         <p class="subtitle">Yes, we really sent that many messages.</p>
       </div>
     </header>
+
+
+    <div class="controls">
+      <input type="file" id="file-input" accept=".json">
+      <button onclick="uploadFile()">Upload result.json</button>
+    </div>
+
 
     <div class="section-label">Overview</div>
     <div class="grid">
@@ -553,12 +562,40 @@
       el.innerHTML = html;
     }
 
-    window.addEventListener("DOMContentLoaded", () => {
-      loadMessages();
-      loadTopWords();
-      loadMonthly();
-      loadStreaks();
+    // window.addEventListener("DOMContentLoaded", () => {
+    //   loadMessages();
+    //   loadTopWords();
+    //   loadMonthly();
+    //   loadStreaks();
+    // });
+
+  async function uploadFile() {
+    const input = document.getElementById("file-input");
+    if (!input.files.length) return;
+
+    const fd = new FormData();
+    fd.append("file", input.files[0]);
+
+    const res = await fetch("/upload", {
+      method: "POST",
+      body: fd
     });
+
+    if (!res.ok) {
+      alert("Upload failed");
+      return;
+    }
+
+    const data = await res.json();
+
+    // reuse existing renderers
+    renderMessages(data.messages);
+    renderTopWords(data.words_top);
+    renderMonthlyChart(data.monthly);
+    renderMonthlySummary(data.monthly);
+    renderStreaks(data.streaks);
+  }
+
   </script>
 </body>
 </html>

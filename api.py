@@ -1,7 +1,9 @@
+import tempfile
+
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, UploadFile, File, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -28,11 +30,55 @@ app.mount(
 def _load() -> list:
     return load_messages(DEFAULT_JSON_PATH)
 
+def filter_by_year(msgs: list, year: int) -> list:
+    out = []
+    for m in msgs:
+        date = m.get("date")
+        if not date:
+            continue
+        try:
+            if date.startswith(str(year)):
+                out.append(m)
+        except Exception:
+            pass
+    return out
 
 @app.get("/")
 def index():
     """Serve the simple frontend."""
     return FileResponse("frontend/index.html")
+
+@app.post("/upload")
+async def upload_result(
+    file: UploadFile = File(...),
+    year: int = 2025,
+):
+    if not file.filename.endswith(".json"):
+        raise HTTPException(400, "Only JSON files allowed")
+
+    raw = await file.read()
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as tmp:
+        tmp.write(raw)
+        tmp_path = Path(tmp.name)
+
+    msgs = load_messages(tmp_path)
+
+    # ✅ correct year filtering
+    msgs = [m for m in msgs if m.date and m.date.year == year]
+
+    return {
+        "messages": {
+            "total_messages": count_messages(msgs),
+            "per_person": count_messages_per_person(msgs),
+        },
+        "words_top": top_words(msgs),
+        "monthly": monthly_message_counts(msgs),
+        "streaks": longest_talking_and_silent_streaks(msgs),
+    }
+
+
+
 
 
 @app.get("/stats/messages")
