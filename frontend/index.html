@@ -209,6 +209,35 @@
       color: #6b7280;
       margin: 16px 0 4px;
     }
+
+    /* === button loading spinner === */
+    button.loading {
+      pointer-events: none;
+      opacity: 0.7;
+    }
+
+    button .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      display: none;
+    }
+
+    button.loading .spinner {
+      display: inline-block;
+    }
+
+    button.loading span {
+      display: none;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
   </style>
 </head>
 <body>
@@ -223,7 +252,9 @@
 
     <div class="controls">
       <input type="file" id="file-input" accept=".json">
-      <button onclick="uploadFile()">Upload result.json</button>
+      <button onclick="uploadFile(this)">
+        <span>Upload result.json</span><div class="spinner"></div>
+      </button>
       <button onclick="window.open('https://telegra.ph/How-to-export-Telegram-Data-for-the-2025-chat-stats-12-19', '_blank')" target="_blank" >How to export chat history</button>
     </div>
 
@@ -254,9 +285,10 @@
       <div class="card">
         <div class="card-header">
           <h2>Top Words</h2>
-          <button onclick="loadTopWords()">
-            <span>⟳</span><span>Refresh</span>
+          <button onclick="loadTopWords(this)">
+            <span>⟳ Refresh</span><div class="spinner"></div>
           </button>
+          
         </div>
 
         
@@ -279,9 +311,10 @@
       <div class="card">
         <div class="card-header">
           <h2>Search Words</h2>
-          <button onclick="searchWords()">
-            <span>🔍</span><span>Search</span>
+          <button onclick="searchWords(this)">
+            <span>🔍 Search</span><div class="spinner"></div>
           </button>
+          
         </div>
         <div class="card-body">
           <div class="controls">
@@ -381,27 +414,33 @@
       }
     }
 
-    async function loadTopWords() {
-      const topN = document.getElementById("top-n").value || 10;
-      const minLen = document.getElementById("top-min-len").value || 3;
-      const skipRaw = document.getElementById("top-skip").value || "";
-      const extraSkip = skipRaw
-        .split(",")
-        .map((s) => s.trim())
-        .filter((s) => s.length > 0);
-
-      const params = new URLSearchParams();
-      params.set("top_n", topN);
-      params.set("min_len", minLen);
-      extraSkip.forEach((w) => params.append("skip", w));
-
+    async function loadTopWords(btn) {
+      setButtonLoading(btn, true);
       try {
+        const topN = document.getElementById("top-n").value || 10;
+        const minLen = document.getElementById("top-min-len").value || 3;
+        const skipRaw = document.getElementById("top-skip").value || "";
+
+        const params = new URLSearchParams();
+        params.set("top_n", topN);
+        params.set("min_len", minLen);
+
+        skipRaw
+          .split(",")
+          .map(s => s.trim())
+          .filter(Boolean)
+          .forEach(w => params.append("skip", w));
+
         const data = await getJSON(`/stats/words/top?${params.toString()}`);
         renderTopWords(data);
       } catch (e) {
         showError("top-words-output", e.message);
+      } finally {
+        setButtonLoading(btn, false);
       }
     }
+
+
 
     function renderTopWords(data) {
       const el = document.getElementById("top-words-output");
@@ -431,26 +470,34 @@
       el.innerHTML = html;
     }
 
-    async function searchWords() {
-      const raw = document.getElementById("search-words").value || "";
-      const words = raw
-        .split(",")
-        .map((s) => s.trim())
-        .filter((s) => s.length > 0);
-      if (!words.length) {
-        showError("search-output", "Enter at least one word");
-        return;
-      }
+    async function searchWords(btn) {
+      setButtonLoading(btn, true);
       try {
+        const raw = document.getElementById("search-words").value || "";
+        const words = raw
+          .split(",")
+          .map(s => s.trim())
+          .filter(Boolean);
+
+        if (!words.length) {
+          showError("search-output", "Enter at least one word");
+          return;
+        }
+
         const data = await getJSON("/stats/words/search", {
           method: "POST",
           body: JSON.stringify(words),
         });
+
         renderSearchResults(data);
       } catch (e) {
         showError("search-output", e.message);
+      } finally {
+        setButtonLoading(btn, false);
       }
     }
+
+
 
     function renderSearchResults(data) {
       const el = document.getElementById("search-output");
@@ -509,6 +556,11 @@
       }
     }
 
+    function setButtonLoading(btn, isLoading) {
+      if (!btn) return;
+        btn.classList.toggle("loading", isLoading);
+    }
+
     function renderMonthlySummary(data) {
       const el = document.getElementById("monthly-output");
       const entries = Object.entries(data || {});
@@ -564,33 +616,38 @@
     //   loadStreaks();
     // });
 
-    async function uploadFile() {
-      const input = document.getElementById("file-input");
-      if (!input.files.length) return;
+    async function uploadFile(btn) {
+      setButtonLoading(btn, true);
+      try {
+        const input = document.getElementById("file-input");
+        if (!input.files.length) return;
 
-      const fd = new FormData();
-      fd.append("file", input.files[0]);
+        const formData = new FormData();
+        formData.append("file", input.files[0]);
 
-      const res = await fetch("/upload", {
-        method: "POST",
-        body: fd
-      });
+        const res = await fetch("/upload", {
+          method: "POST",
+          body: formData
+        });
 
-      if (!res.ok) {
-        alert("Upload failed");
-        return;
+        if (!res.ok) {
+          alert("Upload failed");
+          return;
+        }
+
+        const data = await res.json();
+
+        sessionId = data.session_id;
+
+        renderMessages(data.messages);
+        renderTopWords(data.words_top);
+        renderMonthlyChart(data.monthly);
+        renderMonthlySummary(data.monthly);
+        renderStreaks(data.streaks);
+      } finally {
+        setButtonLoading(btn, false);
       }
-
-      const data = await res.json();
-      sessionId = data.session_id; // store session ID for all future requests
-
-      // reuse existing renderers
-      renderMessages(data.messages);
-      renderTopWords(data.words_top);
-      renderMonthlyChart(data.monthly);
-      renderMonthlySummary(data.monthly);
-      renderStreaks(data.streaks);
-  }
+    }
 
   </script>
 </body>
