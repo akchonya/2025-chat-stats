@@ -1,9 +1,9 @@
 import tempfile
-
+import uuid
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import FastAPI, Query, UploadFile, File, HTTPException
+from fastapi import FastAPI, Query, UploadFile, File, HTTPException, Header
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -21,32 +21,22 @@ DEFAULT_JSON_PATH = Path("data/result.json")
 
 app = FastAPI(title="Chat Stats API")
 
-app.mount(
-    "/static",
-    StaticFiles(directory="frontend"),
-    name="static"
-)
+app.mount("/static", StaticFiles(directory="frontend"), name="static")
 
-def _load() -> list:
+# maps session_id -> temp file path
+uploads: dict[str, Path] = {}
+
+
+def _load(path: Optional[Path] = None) -> list:
+    if path:
+        return load_messages(path)
     return load_messages(DEFAULT_JSON_PATH)
 
-def filter_by_year(msgs: list, year: int) -> list:
-    out = []
-    for m in msgs:
-        date = m.get("date")
-        if not date:
-            continue
-        try:
-            if date.startswith(str(year)):
-                out.append(m)
-        except Exception:
-            pass
-    return out
 
 @app.get("/")
 def index():
-    """Serve the simple frontend."""
     return FileResponse("frontend/index.html")
+
 
 @app.post("/upload")
 async def upload_result(
@@ -63,11 +53,14 @@ async def upload_result(
         tmp_path = Path(tmp.name)
 
     msgs = load_messages(tmp_path)
-
-    # ✅ correct year filtering
     msgs = [m for m in msgs if m.date and m.date.year == year]
 
+    # generate session_id and store path
+    session_id = str(uuid.uuid4())
+    uploads[session_id] = tmp_path
+
     return {
+        "session_id": session_id,
         "messages": {
             "total_messages": count_messages(msgs),
             "per_person": count_messages_per_person(msgs),
@@ -78,12 +71,10 @@ async def upload_result(
     }
 
 
-
-
-
 @app.get("/stats/messages")
-def get_message_stats():
-    msgs = _load()
+def get_message_stats(session_id: Optional[str] = Header(None)):
+    path = uploads.get(session_id)
+    msgs = _load(path)
     return {
         "total_messages": count_messages(msgs),
         "per_person": count_messages_per_person(msgs),
@@ -95,25 +86,32 @@ def get_top_words(
     top_n: int = 10,
     min_len: int = 3,
     skip: Optional[List[str]] = Query(default=None),
+    session_id: Optional[str] = Header(None),
 ):
-    msgs = _load()
+    path = uploads.get(session_id)
+    msgs = _load(path)
     return top_words(msgs, min_len=min_len, top_n=top_n, skip=skip)
 
 
 @app.post("/stats/words/search")
-def post_word_search(words: List[str]):
-    msgs = _load()
+def post_word_search(
+    words: List[str],
+    session_id: Optional[str] = Header(None),
+):
+    path = uploads.get(session_id)
+    msgs = _load(path)
     return count_specific_words(msgs, words)
 
 
 @app.get("/stats/time/monthly")
-def get_monthly_counts():
-    msgs = _load()
+def get_monthly_counts(session_id: Optional[str] = Header(None)):
+    path = uploads.get(session_id)
+    msgs = _load(path)
     return monthly_message_counts(msgs)
 
 
 @app.get("/stats/streaks")
-def get_streaks():
-    msgs = _load()
+def get_streaks(session_id: Optional[str] = Header(None)):
+    path = uploads.get(session_id)
+    msgs = _load(path)
     return longest_talking_and_silent_streaks(msgs)
-

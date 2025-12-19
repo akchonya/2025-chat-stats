@@ -224,6 +224,7 @@
     <div class="controls">
       <input type="file" id="file-input" accept=".json">
       <button onclick="uploadFile()">Upload result.json</button>
+      <button onclick="window.open('https://telegra.ph/How-to-export-Telegram-Data-for-the-2025-chat-stats-12-19', '_blank')" target="_blank" >How to export chat history</button>
     </div>
 
 
@@ -232,9 +233,6 @@
       <div class="card">
         <div class="card-header">
           <h2>Messages</h2>
-          <button onclick="loadMessages()">
-            <span>⟳</span><span>Refresh</span>
-          </button>
         </div>
         <div class="card-body">
           <div id="messages-output" class="muted">Loading…</div>
@@ -244,9 +242,6 @@
       <div class="card">
         <div class="card-header">
           <h2>Streaks</h2>
-          <button onclick="loadStreaks()">
-            <span>⟳</span><span>Refresh</span>
-          </button>
         </div>
         <div class="card-body">
           <div id="streaks-output" class="muted">Loading…</div>
@@ -259,9 +254,6 @@
       <div class="card">
         <div class="card-header">
           <h2>Top Words</h2>
-          <button onclick="loadTopWords()">
-            <span>⟳</span><span>Refresh</span>
-          </button>
         </div>
         <div class="card-body">
           <div class="controls">
@@ -302,9 +294,6 @@
       <div class="card">
         <div class="card-header">
           <h2>Monthly Activity</h2>
-          <button onclick="loadMonthly()">
-            <span>⟳</span><span>Refresh</span>
-          </button>
         </div>
         <div class="card-body">
           <div id="monthly-chart" class="bar-chart"></div>
@@ -336,11 +325,12 @@
       return personColors[name];
     }
 
+    let sessionId = null; // store session id after upload
+
     async function getJSON(url, options = {}) {
-      const res = await fetch(url, {
-        headers: { "Content-Type": "application/json" },
-        ...options,
-      });
+      const headers = options.headers || {};
+      if (sessionId) headers["session-id"] = sessionId; // include session ID
+      const res = await fetch(url, { headers: { "Content-Type": "application/json", ...headers }, ...options });
       if (!res.ok) {
         const text = await res.text();
         throw new Error(`HTTP ${res.status}: ${text}`);
@@ -569,31 +559,32 @@
     //   loadStreaks();
     // });
 
-  async function uploadFile() {
-    const input = document.getElementById("file-input");
-    if (!input.files.length) return;
+    async function uploadFile() {
+      const input = document.getElementById("file-input");
+      if (!input.files.length) return;
 
-    const fd = new FormData();
-    fd.append("file", input.files[0]);
+      const fd = new FormData();
+      fd.append("file", input.files[0]);
 
-    const res = await fetch("/upload", {
-      method: "POST",
-      body: fd
-    });
+      const res = await fetch("/upload", {
+        method: "POST",
+        body: fd
+      });
 
-    if (!res.ok) {
-      alert("Upload failed");
-      return;
-    }
+      if (!res.ok) {
+        alert("Upload failed");
+        return;
+      }
 
-    const data = await res.json();
+      const data = await res.json();
+      sessionId = data.session_id; // store session ID for all future requests
 
-    // reuse existing renderers
-    renderMessages(data.messages);
-    renderTopWords(data.words_top);
-    renderMonthlyChart(data.monthly);
-    renderMonthlySummary(data.monthly);
-    renderStreaks(data.streaks);
+      // reuse existing renderers
+      renderMessages(data.messages);
+      renderTopWords(data.words_top);
+      renderMonthlyChart(data.monthly);
+      renderMonthlySummary(data.monthly);
+      renderStreaks(data.streaks);
   }
 
   </script>
