@@ -3,7 +3,7 @@ import uuid
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import FastAPI, Query, UploadFile, File, HTTPException, Header
+from fastapi import FastAPI, Query, UploadFile, File, HTTPException, Header, Request, Response
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -18,6 +18,8 @@ from stats_words import count_specific_words, top_words
 
 
 DEFAULT_JSON_PATH = Path("data/result.json")
+SHARE_DIR = Path("shared")
+SHARE_DIR.mkdir(exist_ok=True)
 
 app = FastAPI(title="Chat Stats API")
 
@@ -115,3 +117,28 @@ def get_streaks(session_id: Optional[str] = Header(None)):
     path = uploads.get(session_id)
     msgs = _load(path)
     return longest_talking_and_silent_streaks(msgs)
+
+@app.post("/share")
+async def share_report(request: Request):
+    html = await request.body()
+
+    share_id = uuid.uuid4().hex[:10]
+    path = SHARE_DIR / f"{share_id}.html"
+    path.write_bytes(html)
+
+    base_url = str(request.base_url).rstrip("/")
+
+    return {
+        "url": f"{base_url}/share/{share_id}"
+    }
+
+@app.get("/share/{share_id}")
+def get_shared(share_id: str):
+    path = SHARE_DIR / f"{share_id}.html"
+    if not path.exists():
+        return Response(status_code=404)
+
+    return Response(
+        content=path.read_text(encoding="utf-8"),
+        media_type="text/html"
+    )

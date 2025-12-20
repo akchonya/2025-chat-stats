@@ -249,6 +249,8 @@
       </div>
     </header>
 
+    
+
 
     <div class="controls">
       <input type="file" id="file-input" accept=".json">
@@ -256,6 +258,13 @@
         <span>Upload result.json</span><div class="spinner"></div>
       </button>
       <button onclick="window.open('https://telegra.ph/How-to-export-Telegram-Data-for-the-2025-chat-stats-12-19', '_blank')" target="_blank" >How to export chat history</button>
+      <button id="shareBtn"
+              onclick="shareReport(this)"
+              style="display:none">
+        <span>🔗 Share</span><div class="spinner"></div>
+      </button>
+
+      
     </div>
 
 
@@ -617,6 +626,7 @@
     // });
 
     async function uploadFile(btn) {
+      hideShareButton();
       setButtonLoading(btn, true);
       try {
         const input = document.getElementById("file-input");
@@ -644,10 +654,88 @@
         renderMonthlyChart(data.monthly);
         renderMonthlySummary(data.monthly);
         renderStreaks(data.streaks);
+        showShareButton();
       } finally {
         setButtonLoading(btn, false);
       }
     }
+
+    async function shareReport(btn) {
+      setButtonLoading(btn, true);
+      try {
+        // clone full document
+        const docClone = document.documentElement.cloneNode(true);
+
+        // remove all scripts
+        docClone.querySelectorAll("script").forEach(s => s.remove());
+
+        // remove interactive controls
+        docClone.querySelectorAll("button, input").forEach(el => el.remove());
+
+        // optional: remove file upload area entirely
+        const note = document.createElement("div");
+        note.style.margin = "16px 0";
+        note.style.fontSize = "0.8rem";
+        note.style.color = "#9ca3af";
+        note.style.display = "flex";
+        note.style.gap = "8px";
+        note.style.flexWrap = "wrap";
+
+        const text = document.createElement("span");
+        text.textContent = "Shared snapshot — data is frozen.";
+
+        const link = document.createElement("a");
+        link.href = window.location.origin;
+        link.textContent = "Try it yourself →";
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.style.color = "#60a5fa"; // subtle blue
+        link.style.textDecoration = "none";
+
+        note.appendChild(text);
+        note.appendChild(link);
+
+        docClone.querySelector(".page")?.prepend(note);
+
+        const html =
+          "<!DOCTYPE html>\n" +
+          docClone.outerHTML;
+
+        const res = await fetch("/share", {
+          method: "POST",
+          headers: { "Content-Type": "text/html" },
+          body: html
+        });
+
+        if (!res.ok) throw new Error("Share failed");
+
+        const { url } = await res.json();
+
+        // best-effort copy
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(url).catch(() => {});
+        }
+
+        // open shared report
+        window.open(url, "_blank", "noopener");
+
+        // feedback
+        alert("Share link copied and opened!");
+
+      } catch (e) {
+        alert(e.message);
+      } finally {
+        setButtonLoading(btn, false);
+      }
+    }
+    function showShareButton() {
+      document.getElementById("shareBtn").style.display = "inline-flex";
+    }
+
+    function hideShareButton() {
+      document.getElementById("shareBtn").style.display = "none";
+    }
+
 
   </script>
 </body>
